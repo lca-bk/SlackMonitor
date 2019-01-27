@@ -1,5 +1,5 @@
 """ A very simple Slack bot that will listen to incoming messages, compare their senders
-    to a list of valid users and if they are not allowed to post, delete the messages. 
+    to a list of valid users and if they are not allowed to post, delete the messages.
     This is to implement an "Announcement"-like channel where only certain people may post.
 """
 import os
@@ -19,20 +19,27 @@ def lambda_handler(event, context):
     retval = {}
 
     try:
-        if "token" in event and event["token"] == SLACK_CHANNEL_TOKEN:
-            if "user_name" in event and event["user_name"] in USERS_ALLOW:
+        if event["token"] == SLACK_CHANNEL_TOKEN:
+            if event["event"]["user"] in USERS_ALLOW:
                 if DEBUG:
-                    print("User allowed: " +event["user_name"])
-                    #retval['text'] = "User allowed: " + event["user_name"]
+                    print("User allowed: " +event["event"]["user"])
+                    #retval['text'] = "User allowed: " + event["user"]
                     send_to_slack(retval['text'])
             else:
                 if DEBUG:
-                    print("User not allowed: " +event["user_name"])
-                    #retval['text'] = "User not allowed: " + event["user_name"]
-                if "timestamp" in event:
-                    if DEBUG:
-                        print(event["timestamp"])
-                    delete_slack_msg(event["timestamp"])
+                    print("User not allowed: " +event["event"]["user"])
+                    #retval['text'] = "User not allowed: " + event["user"]
+                    print(event["event"]["ts"])
+                sc = SlackClient(SLACK_API_TOKEN)
+                if DEBUG:
+                    print("Deleting message: " + str(event["event"]["ts"]))
+                ret = sc.api_call(
+                    "chat.delete",
+                    channel=SLACK_CHANNEL_ID,
+                    ts=event["event"]["ts"]
+                )
+                if DEBUG:
+                    print(ret)
         else:
             #print("Wrong channel token")
             retval['text'] = "Error: Wrong channel token"
@@ -41,32 +48,3 @@ def lambda_handler(event, context):
         retval['text'] = 'Error: {}'.format(str(e))
 
     return retval
-
-def delete_slack_msg(timestamp):
-    """Delete a Slack Message"""
-    sc = SlackClient(SLACK_API_TOKEN)
-    if DEBUG:
-        print("Deleting message: " + str(timestamp))
-    ret = sc.api_call(
-        "chat.delete",
-        channel=SLACK_CHANNEL_ID,
-        ts=timestamp
-    )
-    if DEBUG:
-        print(ret)
-
-def send_to_slack(text):
-    """Send a Slack Message"""
-    sc = SlackClient(SLACK_API_TOKEN)
-    sc.api_call(
-        "chat.postMessage",
-        channel=SLACK_CHANNEL_ID,
-        text=text
-    )
-
-def main():
-    """Just for testing, never getting called on AWS"""
-    pass
-
-if __name__ == '__main__':
-    main()
